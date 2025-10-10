@@ -27,7 +27,7 @@ Please identify comprehensive edge cases for the following code or feature:
 - Very long strings (1MB+)
 - Strings with special characters
 - Unicode characters and emojis
-- Null bytes (\0)
+- Null bytes (\\0)
 - Strings with only whitespace
 - Leading/trailing whitespace
 
