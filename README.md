@@ -19,13 +19,13 @@ A curated library of high-quality, professionally crafted prompts for common dev
 Install the extension using the Gemini CLI:
 
 ```bash
-gemini extensions install yourusername/prompt-library-extension
+gemini extensions install involvex/prompt-library-extension
 ```
 
 Or install from a local directory:
 
 ```bash
-git clone https://github.com/yourusername/prompt-library-extension.git
+git clone https://github.com/involvex/prompt-library-extension.git
 cd prompt-library-extension
 gemini extensions link .
 ```
@@ -251,9 +251,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📞 Support
 
-- 🐛 [Report Issues](https://github.com/yourusername/prompt-library-extension/issues)
-- 💬 [Discussions](https://github.com/yourusername/prompt-library-extension/discussions)
-- 📧 Email: your.email@example.com
+- 🐛 [Report Issues](https://github.com/involvex/prompt-library-extension/issues)
+- 💬 [Discussions](https://github.com/involvex/prompt-library-extension/discussions)
 
 ## 🗺️ Roadmap
 
