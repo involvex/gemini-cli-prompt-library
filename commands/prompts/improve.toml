@@ -48,4 +48,8 @@ Analyze and improve the following prompt:
 - Are examples provided?
 - Is the level of detail clear?
 
-**
+**Improvements:**
+- Define exact output format
+- Provide examples of desired output
+- Specify length and tone requirements
+"""
