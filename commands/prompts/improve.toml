@@ -48,4 +48,9 @@ Analyze and improve the following prompt:
 - Are examples provided?
 - Is the level of detail clear?
 
-**
+**Improvements:**
+- Define specific output format (JSON, Markdown, Code, etc.)
+- Provide concrete examples of desired output
+- Specify required level of detail
+
+"""
