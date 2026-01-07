@@ -1,79 +1,13 @@
 prompt = """
-# Design CI/CD Pipeline
+# CI/CD Pipeline
 
-Please design a comprehensive CI/CD pipeline for the following project:
+Please help set up CI/CD for:
 
 {{args}}
 
-## Pipeline Design Framework
+## Pipeline Structure
 
-### 1. Project Analysis
-
-#### Technology Stack
-- **Language/Framework**: What technologies are used?
-- **Package Manager**: npm, pip, maven, gradle, etc.
-- **Test Framework**: Jest, pytest, JUnit, etc.
-- **Build Tools**: Webpack, vite, make, etc.
-
-#### Repository Structure
-- **Monorepo vs Multi-repo**: Single repo or multiple?
-- **Branch Strategy**: GitFlow, trunk-based, feature branches
-- **Code Quality Tools**: Linters, formatters, type checkers
-
-### 2. Pipeline Stages
-
-#### Stage 1: Code Quality
-```
-Jobs:
-- Linting (ESLint, Pylint, etc.)
-- Formatting check (Prettier, Black, etc.)
-- Type checking (TypeScript, mypy, etc.)
-- Security scanning (SAST, dependency check)
-```
-
-#### Stage 2: Testing
-```
-Jobs:
-- Unit tests (fast, isolated)
-- Integration tests (service interactions)
-- End-to-end tests (user workflows)
-- Performance tests (if applicable)
-- Code coverage analysis
-```
-
-#### Stage 3: Build
-```
-Jobs:
-- Compile/transpile code
-- Bundle assets
-- Create artifacts (Docker images, binaries)
-- Version bumping
-- Artifact signing
-```
-
-#### Stage 4: Security Scan
-```
-Jobs:
-- Dependency vulnerability scan
-- Container image scan
-- Infrastructure scan
-- Secret detection
-- License compliance
-```
-
-#### Stage 5: Deployment
-```
-Jobs:
-- Deploy to development
-- Deploy to staging
-- Automated acceptance tests
-- Deploy to production
-- Health checks
-```
-
-### 3. Pipeline Configuration
-
-#### GitHub Actions Example
+### 1. GitHub Actions Workflow
 ```yaml
 name: CI/CD Pipeline
 
@@ -84,174 +18,264 @@ on:
     branches: [main]
 
 env:
-  NODE_VERSION: '18'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run linter
-        run: npm run lint
-
   test:
     runs-on: ubuntu-latest
-    needs: lint
     steps:
       - uses: actions/checkout@v4
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '20'
           cache: 'npm'
+      
       - name: Install dependencies
         run: npm ci
+      
       - name: Run tests
         run: npm test -- --coverage
+      
       - name: Upload coverage
         uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
 
   build:
-    runs-on: ubuntu-latest
     needs: test
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build and push Docker image
+      
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  security-scan:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   deploy-staging:
+    needs: [build, security-scan]
     runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/develop'
     environment: staging
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Deploy to staging
-        run: kubectl apply -f k8s/staging/
+        run: |
+          kubectl config use-context staging
+          kubectl apply -f k8s/staging/
+          kubectl rollout status deployment/app-staging
 
   deploy-production:
-    runs-on: ubuntu-latest
     needs: deploy-staging
-    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
     environment: production
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Deploy to production
-        run: kubectl apply -f k8s/production/
+        run: |
+          kubectl config use-context production
+          kubectl apply -f k8s/production/
+          kubectl rollout status deployment/app-production
 ```
 
-### 4. Branch Strategy
-
-#### Feature Branch Flow
-```
-feature/* → develop → main → production
-```
-
-#### Environment Promotion
-```
-Pull Request → CI checks pass
-      ↓
-Merge to develop → Auto-deploy to Dev
-      ↓
-Test in Dev → Manual approval
-      ↓
-Merge to main → Deploy to Staging
-      ↓
-QA in Staging → Manual approval
-      ↓
-Deploy to Production
-```
-
-### 5. Deployment Strategies
-
-#### Blue-Green Deployment
+### 2. GitLab CI Pipeline
 ```yaml
-deploy:
-  runs-on: ubuntu-latest
-  steps:
-    - name: Deploy to blue environment
-      run: |
-        kubectl apply -f k8s/blue/
-        kubectl set image deployment/web web=image:v2 -n production
-    - name: Health check
-      run: |
-        curl -f http://blue.example.com/health
+stages:
+  - test
+  - build
+  - security
+  - deploy
+
+test:
+  stage: test
+  image: node:20
+  script:
+    - npm ci
+    - npm test
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    reports:
+      junit: junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+
+build:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+  only:
+    - main
+    - develop
+
+security:
+  stage: security
+  image: 
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy fs --exit-code 1 --severity HIGH,CRITICAL .
+  allow_failure: true
+
+deploy_staging:
+  stage: deploy
+  script:
+    - kubectl config use-context staging
+    - kubectl set image deployment/app app=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - kubectl rollout status deployment/app-staging
+  environment:
+    name: staging
+  only:
+    - develop
+
+deploy_production:
+  stage: deploy
+  script:
+    - kubectl config use-context production
+    - kubectl set image deployment/app app=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - kubectl rollout status deployment/app-production
+  environment:
+    name: production
+  when: manual
+  only:
+    - main
 ```
 
-#### Canary Deployment
+### 3. ArgoCD Application
 ```yaml
-deploy-canary:
-  runs-on: ubuntu-latest
-  steps:
-    - name: Deploy canary (10%)
-      run: |
-        kubectl patch deployment/web -p '{"spec":{"replicas":10}}'
-        kubectl set image deployment/web web=new-image:v2 -n production
-    - name: Monitor metrics
-      run: |
-        sleep 300
-        # Check error rates
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{app_name}}
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/{{org}}/{{repo}}.git
+    targetRevision: HEAD
+    path: k8s/overlays/${{ env }}
+    helm:
+      valueFiles:
+        - values-${{ env }}.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{app_name}}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10
 ```
 
-### 6. Rollback Strategy
+## Pipeline Best Practices
 
-#### Automatic Rollback
+### Version Control
+- Keep pipeline as code
+- Use versioned dependencies
+- Review pipeline changes via PRs
+- Document pipeline stages
+
+### Testing
+- Run tests in isolation
+- Use parallel jobs
+- Fail fast on critical tests
+- Generate comprehensive reports
+
+### Security
+- Scan for vulnerabilities
+- Use secret management
+- Implement least privilege
+- Audit pipeline access
+
+### Deployment
+- Use deployment strategies
+- Implement rollbacks
+- Monitor deployments
+- Use feature flags
+
+## Deployment Strategies
+
+### Blue-Green Deployment
 ```yaml
-- name: Health check
-  run: |
-    if ! curl -f http://$URL/health; then
-      echo "Health check failed, rolling back..."
-      kubectl rollout undo deployment/myapp -n production
-      exit 1
-    fi
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+spec:
+  strategy:
+    blueGreen:
+      activeService: app-active
+      previewService: app-preview
+      autoPromotionEnabled: false
 ```
 
-### 7. Security Best Practices
-
-#### Secret Management
+### Canary Deployment
 ```yaml
-secrets:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+spec:
+  strategy:
+    canary:
+      steps:
+        - setWeight: 5
+        - pause: {duration: 5m}
+        - setWeight: 25
+        - pause: {duration: 5m}
+        - setWeight: 50
+        - pause: {duration: 5m}
+        - setWeight: 75
+        - pause: {duration: 5m}
+      trafficRouting:
+        istio:
+          virtualService:
+            name: app-vsvc
+            routes:
+              - primary
 ```
 
-### 8. Pipeline Optimization
-
-#### Caching
-```yaml
-- name: Cache node_modules
-  uses: actions/cache@v3
-  with:
-    path: ~/.npm
-    key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-    restore-keys: |
-      ${{ runner.os }}-node-
-```
-
-### 9. Output Format
+## Output Requirements
 
 Provide:
-
-1. **Pipeline Overview**: Summary of the CI/CD flow
-2. **Pipeline Configuration**: Complete YAML configuration
-3. **Stage Breakdown**: Each stage with jobs and steps
-4. **Environment Setup**: How environments are configured
-5. **Deployment Strategy**: How code reaches production
-6. **Rollback Plan**: How to recover from failures
-7. **Security Considerations**: Secret management, permissions
-8. **Performance Optimization**: Caching, parallelization
-
-Generate a complete, production-ready CI/CD pipeline following best practices.
+1. CI/CD pipeline configuration
+2. Deployment manifests
+3. Environment-specific configs
+4. Rollback procedures
+5. Pipeline documentation
 """

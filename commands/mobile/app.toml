@@ -1,0 +1,136 @@
+prompt = """
+# Design Mobile Application
+
+Please design a comprehensive mobile application for the following requirements:
+
+{{args}}
+
+## Mobile App Design Framework
+
+### 1. Architecture
+
+#### Clean Architecture
+```
+presentation/          # UI Layer (React Native/Flutter)
+domain/                # Business Logic
+data/                  # Data Layer
+di/                    # Dependency Injection
+```
+
+### 2. State Management
+
+#### Redux Pattern
+```typescript
+interface AppState {
+  auth: AuthState;
+  posts: PostsState;
+}
+
+interface AuthState {
+  user: User | null;
+  token: string | null;
+  isLoading: boolean;
+}
+
+export const login = createAsyncThunk(
+  'auth/login',
+  async (credentials) => {
+    const response = await api.post('/auth/login', credentials);
+    return response.data;
+  }
+);
+```
+
+### 3. Networking
+
+#### API Client
+```typescript
+const apiClient = axios.create({
+  baseURL: 'https://api.example.com',
+  timeout: 30000,
+});
+
+apiClient.interceptors.request.use((config) => {
+  const token = store.getState().auth.token;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+```
+
+### 4. Local Storage
+
+#### Offline-First
+```typescript
+const db = SQLite.openDatabase('app.db');
+
+export const setupDatabase = async () => {
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      email TEXT,
+      sync_status TEXT DEFAULT 'synced'
+    );
+  `);
+};
+```
+
+### 5. Push Notifications
+
+#### FCM Setup
+```typescript
+export const setupNotifications = async () => {
+  const permission = await messaging.requestPermission();
+  if (permission === 'granted') {
+    const token = await getToken(messaging, {
+      vapidKey: 'YOUR_VAPID_KEY',
+    });
+    await api.post('/notifications/register', { token });
+  }
+};
+```
+
+### 6. Performance
+
+#### Image Caching
+```typescript
+export const cacheImage = async (uri: string) => {
+  const filename = uri.split('/').pop() || '';
+  const cachePath = `${FileSystem.cacheDirectory}images/${filename}`;
+  
+  const cached = await FileSystem.getInfoAsync(cachePath);
+  if (!cached.exists) {
+    await FileSystem.downloadAsync(uri, cachePath);
+  }
+  return cachePath;
+};
+```
+
+### 7. Testing
+
+```typescript
+describe('Button', () => {
+  it('renders correctly', () => {
+    const { getByText } = render(
+      <Button title="Press Me" onPress={() => {}} />
+    );
+    expect(getByText('Press Me')).toBeTruthy();
+  });
+});
+```
+
+### 8. Output Format
+
+Provide:
+
+1. **Architecture**: Clean architecture
+2. **State Management**: Redux patterns
+3. **Networking**: API client
+4. **Local Storage**: Offline-first
+5. **Push Notifications**: FCM
+6. **Performance**: Caching
+7. **Components**: Reusable UI
+8. **Testing**: Jest setup
+
+Generate a complete mobile app design.
+"""

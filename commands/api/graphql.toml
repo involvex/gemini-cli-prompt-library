@@ -1,0 +1,436 @@
+prompt = """
+# Design GraphQL API
+
+Please design a comprehensive GraphQL API for the following requirements:
+
+{{args}}
+
+## GraphQL Design Framework
+
+### 1. Schema Design
+
+#### Type Definitions
+```graphql
+# Core Types
+type User {
+  id: ID!
+  username: String!
+  email: String!
+  createdAt: String!
+  posts: [Post!]!
+  comments: [Comment!]!
+}
+
+type Post {
+  id: ID!
+  title: String!
+  content: String!
+  author: User!
+  comments: [Comment!]!
+  tags: [Tag!]!
+  createdAt: String!
+  updatedAt: String
+}
+
+type Comment {
+  id: ID!
+  content: String!
+  author: User!
+  post: Post!
+  createdAt: String!
+}
+
+type Tag {
+  id: ID!
+  name: String!
+  posts: [Post!]!
+}
+
+# Pagination Types
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type PostConnection {
+  edges: [PostEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type PostEdge {
+  node: Post!
+  cursor: String!
+}
+
+# Input Types
+input CreateUserInput {
+  username: String!
+  email: String!
+  password: String!
+}
+
+input CreatePostInput {
+  title: String!
+  content: String!
+  authorId: ID!
+  tagNames: [String!]
+}
+
+input UpdatePostInput {
+  id: ID!
+  title: String
+  content: String
+}
+
+input PostFilterInput {
+  authorId: ID
+  tagName: String
+  search: String
+  fromDate: String
+  toDate: String
+}
+
+input SortInput {
+  field: String!
+  direction: SortDirection!
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+```
+
+### 2. Query Design
+
+```graphql
+type Query {
+  # Single resource queries
+  user(id: ID!): User
+  post(id: ID!): Post
+  
+  # List queries with pagination
+  posts(
+    filter: PostFilterInput
+    first: Int
+    after: String
+    sort: SortInput
+  ): PostConnection!
+  
+  # Search queries
+  searchPosts(query: String!): [Post!]!
+  
+  # User-related queries
+  myProfile: User!
+  myPosts(first: Int, after: String): PostConnection!
+  
+  # Top-level collections
+  users(first: Int, after: String): [User!]!
+  tags(first: Int): [Tag!]!
+}
+```
+
+### 3. Mutation Design
+
+```graphql
+type Mutation {
+  # User mutations
+  createUser(input: CreateUserInput!): User!
+  updateUser(username: String): User!
+  deleteUser(id: ID!): Boolean!
+  
+  # Auth mutations
+  login(email: String!, password: String!): AuthPayload!
+  register(input: CreateUserInput!): AuthPayload!
+  refreshToken(refreshToken: String!): AuthPayload!
+  
+  # Post mutations
+  createPost(input: CreatePostInput!): Post!
+  updatePost(input: UpdatePostInput!): Post!
+  deletePost(id: ID!): Boolean!
+  
+  # Comment mutations
+  createComment(postId: ID!, content: String!): Comment!
+  deleteComment(id: ID!): Boolean!
+}
+
+type AuthPayload {
+  accessToken: String!
+  refreshToken: String!
+  user: User!
+}
+```
+
+### 4. Subscription Design
+
+```graphql
+type Subscription {
+  # Real-time updates
+  postCreated: Post!
+  postUpdated(id: ID!): Post!
+  postDeleted(id: ID!): ID!
+  
+  # Comment notifications
+  commentAdded(postId: ID!): Comment!
+  
+  # User activity
+  userOnline(userId: ID!): User!
+}
+```
+
+### 5. Resolver Organization
+
+#### Folder Structure
+```
+src/
+├── graphql/
+│   ├── schema/
+│   │   ├── typeDefs.ts
+│   │   └── schema.ts
+│   ├── resolvers/
+│   │   ├── Query.ts
+│   │   ├── Mutation.ts
+│   │   ├── Subscription.ts
+│   │   ├── User.ts
+│   │   ├── Post.ts
+│   │   └── Comment.ts
+│   ├── directives/
+│   │   └── auth.ts
+│   ├── middlewares/
+│   │   └── auth.ts
+│   └── scalars/
+│       └── date.ts
+├── models/
+│   └── index.ts
+└── services/
+    ├── userService.ts
+    └── postService.ts
+```
+
+#### Resolver Implementation
+```typescript
+// resolvers/Post.ts
+export const postResolvers = {
+  Post: {
+    id: (parent) => parent.id,
+    title: (parent) => parent.title,
+    content: (parent) => parent.content,
+    author: async (parent, args, context) => {
+      return context.userService.getById(parent.authorId);
+    },
+    comments: async (parent, args, context) => {
+      return context.commentService.getByPostId(parent.id);
+    },
+    tags: async (parent, args, context) => {
+      return context.tagService.getByPostId(parent.id);
+    },
+    createdAt: (parent) => parent.createdAt.toISOString(),
+  },
+  
+  Query: {
+    post: async (parent, { id }, context) => {
+      return context.postService.getById(id);
+    },
+    
+    posts: async (parent, { filter, first, after, sort }, context) => {
+      const pagination = {
+        first,
+        after,
+        sort,
+      };
+      return context.postService.getAll(filter, pagination);
+    },
+    
+    searchPosts: async (parent, { query }, context) => {
+      return context.postService.search(query);
+    },
+  },
+  
+  Mutation: {
+    createPost: async (parent, { input }, context) => {
+      context.auth.requireAuth();
+      return context.postService.create({
+        ...input,
+        authorId: context.currentUser.id,
+      });
+    },
+    
+    updatePost: async (parent, { input }, context) => {
+      context.auth.requireAuth();
+      const post = await context.postService.getById(input.id);
+      context.auth.requireOwnership(post.authorId);
+      return context.postService.update(input.id, input);
+    },
+    
+    deletePost: async (parent, { id }, context) => {
+      context.auth.requireAuth();
+      const post = await context.postService.getById(id);
+      context.auth.requireOwnership(post.authorId);
+      return context.postService.delete(id);
+    },
+  },
+};
+```
+
+### 6. DataLoader Pattern
+
+```typescript
+// dataloaders/index.ts
+import DataLoader from 'dataloader';
+import { userService } from '../services/userService';
+import { postService } from '../services/postService';
+
+export const createLoaders = () => ({
+  user: new DataLoader(async (ids) => {
+    const users = await userService.getByIds(ids);
+    return ids.map((id) => users.find((u) => u.id === id));
+  }),
+  
+  post: new DataLoader(async (ids) => {
+    const posts = await postService.getByIds(ids);
+    return ids.map((id) => posts.find((p) => p.id === id));
+  }),
+  
+  userPosts: new DataLoader(async (userIds) => {
+    const postsByUser = await postService.getByAuthorIds(userIds);
+    return userIds.map((id) => postsByUser[id] || []);
+  }),
+});
+```
+
+### 7. Authentication & Authorization
+
+```typescript
+// directives/auth.ts
+import { SchemaDirectiveVisitor } from '@graphql-tools/schema';
+import { defaultFieldResolver } from 'graphql';
+
+class AuthDirective extends SchemaDirectiveVisitor {
+  visitFieldDefinition(field) {
+    const { resolve = defaultFieldResolver } = field;
+    const { requires } = this.args;
+    
+    field.resolve = async (parent, args, context, info) => {
+      if (!context.user) {
+        throw new Error('Not authenticated');
+      }
+      
+      if (requires && !context.user.roles.includes(requires)) {
+        throw new Error(`Requires role: ${requires}`);
+      }
+      
+      return resolve.apply(this, [parent, args, context, info]);
+    };
+  }
+}
+
+// Usage in schema
+directive @auth(requires: Role) on FIELD_DEFINITION
+
+type User {
+  email: String! @auth(requires: ADMIN)
+}
+```
+
+### 8. Error Handling
+
+```typescript
+// errors/index.ts
+export class GraphQLError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public extensions?: Record<string, unknown>
+  ) {
+    super(message);
+    this.name = 'GraphQLError';
+  }
+}
+
+export const errorHandler = (error: Error) => {
+  if (error instanceof GraphQLError) {
+    return {
+      message: error.message,
+      extensions: {
+        code: error.code,
+        ...error.extensions,
+      },
+    };
+  }
+  
+  // Log unexpected errors
+  console.error('Unexpected error:', error);
+  
+  return {
+    message: 'Internal server error',
+    extensions: {
+      code: 'INTERNAL_ERROR',
+    },
+  };
+};
+```
+
+### 9. Performance Optimization
+
+#### Query Complexity
+```typescript
+import { getComplexity, simpleEstimator } from 'graphql-query-complexity';
+
+const queryComplexityPlugin = (schema: GraphQLSchema) => ({
+  requestDidStart: () => ({
+    didResolveOperation: (context) => {
+      const { operation, variables } = context;
+      const complexity = getComplexity({
+        schema,
+        operationName: operation.name?.value,
+        variables,
+        estimators: [
+          simpleEstimator({ defaultComplexity: 1 }),
+        ],
+      });
+      
+      if (complexity > 100) {
+        throw new Error('Query is too complex');
+      }
+    },
+  }),
+});
+```
+
+#### Caching
+```typescript
+// Redis caching for queries
+const cacheMiddleware = (duration: number) => {
+  return async (resolve, parent, args, context, info) => {
+    const cacheKey = `graphql:${info.fieldName}:${JSON.stringify(args)}`;
+    
+    const cached = await context.redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+    
+    const result = await resolve();
+    await context.redis.setex(cacheKey, duration, JSON.stringify(result));
+    return result;
+  };
+};
+```
+
+### 10. Output Format
+
+Provide:
+
+1. **Schema Definition**: Complete GraphQL schema with types
+2. **Queries**: All query operations with pagination
+3. **Mutations**: CRUD operations with input types
+4. **Subscriptions**: Real-time event streams
+5. **Resolvers**: Implementation patterns and best practices
+6. **DataLoaders**: N+1 query prevention
+7. **Authentication**: Auth directives and middleware
+8. **Error Handling**: Structured error responses
+9. **Performance**: Query complexity, caching strategies
+
+Generate a complete, production-ready GraphQL API design.

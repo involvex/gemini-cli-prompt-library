@@ -1,0 +1,163 @@
+prompt = """
+# Design Database Schema
+
+Please help design a database schema for the following requirements:
+
+{{args}}
+
+## Schema Design Framework
+
+### 1. Requirements Analysis
+
+#### Functional Requirements
+- What data needs to be stored?
+- What operations will be performed?
+- What are the query patterns?
+- What are the performance requirements?
+
+#### Non-Functional Requirements
+- Expected data volume
+- Read vs write ratio
+- Latency requirements
+- Availability requirements
+- Scalability requirements
+
+### 2. Entity Relationship
+
+#### Core Entities
+Identify main entities and their relationships:
+
+**Entity 1: [Name]**
+- Attributes:
+  - field1: Type, constraints
+  - field2: Type, constraints
+- Relationships:
+  - One-to-Many with [Entity]
+  - Many-to-Many with [Entity]
+
+**Entity 2: [Name]**
+- ...
+
+#### Relationships Diagram
+```
+[Entity A] 1───* [Entity B] *───1 [Entity C]
+```
+
+### 3. Schema Design
+
+#### Table Definitions
+
+```sql
+CREATE TABLE table_name (
+    id SERIAL PRIMARY KEY,
+    field1 VARCHAR(255) NOT NULL,
+    field2 INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Indexes
+- Index 1: [fields] - for [query pattern]
+- Index 2: [fields] - for [query pattern]
+- Unique constraint: [fields]
+
+### 4. Normalization
+
+#### Normal Forms
+- 1NF: [Checklist]
+- 2NF: [Checklist]
+- 3NF: [Checklist]
+
+#### Denormalization Decisions
+- Trade-off 1: [Reason for denormalization]
+- Trade-off 2: [Reason for denormalization]
+
+### 5. Data Types & Constraints
+
+#### Column Specifications
+
+| Column | Type | Nullable | Default | Constraints |
+|--------|------|----------|---------|-------------|
+| id | UUID | No | - | Primary Key |
+| name | VARCHAR(255) | No | - | - |
+| email | VARCHAR(255) | No | - | Unique |
+| status | ENUM | No | 'active' | - |
+| created_at | TIMESTAMP | No | CURRENT_TIMESTAMP | - |
+
+#### Constraints
+- Primary keys
+- Foreign keys
+- Unique constraints
+- Check constraints
+- Not null constraints
+
+### 6. Query Patterns
+
+#### Common Queries
+1. Query: [Description]
+   ```sql
+   SELECT ... FROM ...
+   ```
+   Optimization: [Index/approach]
+
+2. Query: [Description]
+   ```sql
+   SELECT ... FROM ... WHERE ...
+   ```
+   Optimization: [Index/approach]
+
+### 7. Migrations
+
+#### Migration Script
+```sql
+-- Up migration
+CREATE TABLE ...;
+
+-- Down migration
+DROP TABLE ...;
+```
+
+### 8. Seed Data
+
+#### Sample Records
+```sql
+INSERT INTO table_name (...) VALUES (...);
+```
+
+### 9. Performance Considerations
+
+#### Indexing Strategy
+- Clustered indexes
+- Non-clustered indexes
+- Covering indexes
+- Full-text indexes
+
+#### Partitioning
+- Partition key: [field]
+- Partition strategy: [range/hash]
+
+### 10. Security
+
+#### Access Control
+- Role-based access
+- Row-level security
+- Column-level encryption
+
+### 11. Backup & Recovery
+
+#### Backup Strategy
+- Full backup frequency
+- Incremental backup frequency
+- Point-in-time recovery
+
+### 12. Documentation
+
+#### Schema Documentation
+- Entity descriptions
+- Relationship explanations
+- Business rules
+- Data dictionary
+
+Generate a complete, production-ready database schema following this framework.
+"""

@@ -1,455 +1,171 @@
 prompt = """
-# Design Kubernetes Configuration
+# Kubernetes Configuration
 
-Please design comprehensive Kubernetes configurations for the following application:
+Please help configure Kubernetes resources for:
 
 {{args}}
 
-## Kubernetes Best Practices Framework
+## Kubernetes Resources
 
-### 1. Namespace Structure
-
+### 1. Deployment
 ```yaml
-# namespaces.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: production
-  labels:
-    env: production
-    team: platform
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: staging
-  labels:
-    env: staging
-    team: platform
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: development
-  labels:
-    env: development
-    team: platform
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: monitoring
-  labels:
-    team: sre
-```
-
-### 2. Deployment Configuration
-
-#### Production Deployment
-```yaml
-# deployments/app-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: myapp
-  namespace: production
+  name: {{name}}
   labels:
-    app: myapp
-    version: v1
-    tier: frontend
+    app: {{name}}
 spec:
-  replicas: 3
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+  replicas: {{replicas|default: 3}}
   selector:
     matchLabels:
-      app: myapp
+      app: {{name}}
   template:
     metadata:
       labels:
-        app: myapp
-        version: v1
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "3000"
-        prometheus.io/path: "/metrics"
+        app: {{name}}
     spec:
-      serviceAccountName: myapp
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
       containers:
-        - name: myapp
-          image: myapp:latest
-          imagePullPolicy: Always
+        - name: {{name}}
+          image: {{image}}
           ports:
-            - name: http
-              containerPort: 3000
-              protocol: TCP
-          env:
-            - name: NODE_ENV
-              value: "production"
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: db-credentials
-                  key: url
-                  optional: false
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: api-credentials
-                  key: key
-                  optional: false
-          envFrom:
-            - configMapRef:
-                name: app-config
+            - containerPort: {{port|default: 8080}}
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: "{{cpu_request|default: 100m}}"
+              memory: "{{memory_request|default: 128Mi}}"
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: "{{cpu_limit|default: 500m}}"
+              memory: "{{memory_limit|default: 256Mi}}"
+          env:
+            {{#if env}}
+            {{env}}
+            {{/if}}
           livenessProbe:
             httpGet:
-              path: /health
-              port: http
+              path: {{liveness_path|default: /health}}
+              port: {{port|default: 8080}}
             initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /ready
-              port: http
+              path: {{readiness_path|default: /ready}}
+              port: {{port|default: 8080}}
             initialDelaySeconds: 5
             periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 3
-          startupProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 0
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 30
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app: myapp
-                topologyKey: kubernetes.io/hostname
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - compute-optimized
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: DoNotSchedule
-          labelSelector:
-            matchLabels:
-              app: myapp
 ```
 
-### 3. Service Configuration
-
+### 2. Service
 ```yaml
-# services/app-service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: myapp
-  namespace: production
-  labels:
-    app: myapp
-  annotations:
-    description: "MyApp frontend service"
+  name: {{name}}
 spec:
-  type: ClusterIP
-  ports:
-    - name: http
-      port: 80
-      targetPort: http
-      protocol: TCP
+  type: {{service_type|default: ClusterIP}}
   selector:
-    app: myapp
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: myapp-external
-  namespace: production
-spec:
-  type: LoadBalancer
-  loadBalancerIP: 203.0.113.10
+    app: {{name}}
   ports:
-    - port: 80
-      targetPort: http
+    - port: {{port|default: 80}}
+      targetPort: {{target_port|default: 8080}}
       protocol: TCP
-      name: http
-  selector:
-    app: myapp
 ```
 
-### 4. Ingress Configuration
-
+### 3. Ingress
 ```yaml
-# ingresses/app-ingress.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: myapp
-  namespace: production
+  name: {{name}}
   annotations:
     kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      add_header X-Frame-Options "SAMEORIGIN" always;
-      add_header X-Content-Type-Options "nosniff" always;
-      add_header X-XSS-Protection "1; mode=block" always;
 spec:
   tls:
     - hosts:
-        - myapp.example.com
-      secretName: myapp-tls
+        - {{domain}}
+      secretName: {{name}}-tls
   rules:
-    - host: myapp.example.com
+    - host: {{domain}}
       http:
         paths:
-          - path: /
+          - path: {{path|default: /}}
             pathType: Prefix
             backend:
               service:
-                name: myapp
+                name: {{name}}
                 port:
-                  name: http
+                  number: {{port|default: 80}}
 ```
 
-### 5. ConfigMap and Secrets
-
+### 4. ConfigMap
 ```yaml
-# configmaps/app-config.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: app-config
-  namespace: production
+  name: {{name}}-config
 data:
-  NODE_ENV: "production"
-  LOG_LEVEL: "info"
-  API_ENDPOINT: "https://api.example.com"
-  CACHE_TTL: "3600"
----
-# secrets/app-secrets.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: db-credentials
-  namespace: production
-type: Opaque
-stringData:
-  url: "postgres://user:password@db.example.com:5432/myapp"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: api-credentials
-  namespace: production
-type: Opaque
-stringData:
-  key: "your-api-key-here"
+  {{config_data}}
 ```
 
-### 6. Horizontal Pod Autoscaler
-
+### 5. Secret
 ```yaml
-# hpa/app-hpa.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{name}}-secret
+type: Opaque
+stringData:
+  {{secret_data}}
+```
+
+### 6. HorizontalPodAutoscaler
+```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: myapp
-  namespace: production
+  name: {{name}}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: myapp
-  minReplicas: 3
-  maxReplicas: 20
+    name: {{name}}
+  minReplicas: {{min_replicas|default: 2}}
+  maxReplicas: {{max_replicas|default: 10}}
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 70
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 10
-          periodSeconds: 60
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 15
-      selectPolicy: Max
+          averageUtilization: {{cpu_target|default: 70}}
 ```
 
-### 7. PodDisruptionBudget
+## Best Practices
 
-```yaml
-# pdb/app-pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: myapp
-  namespace: production
-spec:
-  minAvailable: 2
-  selector:
-    matchLabels:
-      app: myapp
-```
+### Security
+- Use non-root user in container
+- Set resource limits
+- Enable pod security policies
+- Use secrets for sensitive data
 
-### 8. NetworkPolicy
+### Health Checks
+- Configure liveness probe
+- Configure readiness probe
+- Set appropriate timeouts
 
-```yaml
-# network-policies/app-network-policy.yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: myapp
-  namespace: production
-spec:
-  podSelector:
-    matchLabels:
-      app: myapp
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: ingress-nginx
-        - podSelector:
-            matchLabels:
-              app: myapp
-      ports:
-        - protocol: TCP
-          port: 3000
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              name: production
-        - podSelector:
-            matchLabels:
-              app: db
-      ports:
-        - protocol: TCP
-          port: 5432
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              name: kube-system
-      ports:
-        - protocol: UDP
-          port: 53
-```
+### Scaling
+- Configure HPA for auto-scaling
+- Set resource requests/limits
+- Use pod disruption budgets
 
-### 9. ResourceQuota
-
-```yaml
-# resource-quotas/production-quota.yaml
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: production-quota
-  namespace: production
-spec:
-  hard:
-    pods: "100"
-    requests.cpu: "10"
-    requests.memory: 20Gi
-    limits.cpu: "20"
-    limits.memory: 40Gi
-    persistentvolumeclaims: "10"
-    services: "10"
-```
-
-### 10. Helm Chart Structure
-
-```
-myapp-chart/
-├── Chart.yaml
-├── values.yaml
-├── values-production.yaml
-├── values-staging.yaml
-├── templates/
-│   ├── _helpers.tpl
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   ├── ingress.yaml
-│   ├── hpa.yaml
-│   ├── pdb.yaml
-│   ├── configmap.yaml
-│   ├── secrets.yaml
-│   └── network-policy.yaml
-└── charts/
-    ├── postgresql/
-    └── redis/
-```
-
-### 11. Output Format
+## Output Requirements
 
 Provide:
-
-1. **Namespace Configuration**: All namespaces for environments
-2. **Deployment**: Production-ready Deployment with all best practices
-3. **Service**: Internal and external service configuration
-4. **Ingress**: HTTPS-enabled ingress with security headers
-5. **ConfigMap/Secrets**: Environment configuration and secrets
-6. **HPA**: Auto-scaling configuration
-7. **PDB**: Pod disruption budget
-8. **NetworkPolicy**: Network security policies
-9. **ResourceQuota**: Resource limits per namespace
-
-Generate complete, secure Kubernetes configurations following best practices.
+1. Complete Kubernetes manifests
+2. Namespace configuration
+3. Resource quotas
+4. Network policies
+5. RBAC configuration
+6. Helm chart structure (if applicable)
 """
