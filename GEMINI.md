@@ -64,6 +64,31 @@ This extension provides a curated library of high-quality prompts for common dev
 - **create-prompt-template**: Create reusable prompt templates
 - **prompt-best-practices**: Learn prompt engineering tips
 
+### 9. Data Engineering
+
+- **data-pipeline**: Design data pipelines
+- **data-schema**: Design database schemas
+
+### 10. DevOps & Infrastructure
+
+- **devops-ci-cd**: Design CI/CD pipelines
+- **devops-docker**: Create Docker configurations
+- **devops-kubernetes**: Design Kubernetes deployments
+- **devops-terraform**: Create Terraform configurations
+- **devops-infrastructure**: Design infrastructure
+- **devops-monitoring**: Set up monitoring
+- **devops-security**: DevSecOps practices
+
+### 11. Mobile Development
+
+- **mobile-react-native**: React Native development
+- **mobile-flutter**: Flutter development
+- **mobile-app**: General mobile app guidance
+
+### 12. API Development
+
+- **api-graphql**: Design GraphQL APIs
+
 ## How to Use Prompts
 
 When a user runs a prompt command (e.g., `/prompts:code-review-security`), you should:

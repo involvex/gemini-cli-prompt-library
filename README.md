@@ -7,7 +7,7 @@ A curated library of high-quality, professionally crafted prompts for common dev
 
 ## ✨ Features
 
-- 🎯 **30+ Professional Prompts** - Carefully crafted for common development tasks
+- 🎯 **50+ Professional Prompts** - Carefully crafted for common development tasks
 - 🚀 **Instant Access** - Simple slash commands for quick execution
 - 📖 **Learn by Example** - See prompt engineering best practices in action
 - 🎨 **Organized Categories** - Easy to browse and discover prompts
@@ -19,14 +19,14 @@ A curated library of high-quality, professionally crafted prompts for common dev
 Install the extension using the Gemini CLI:
 
 ```bash
-gemini extensions install yourusername/prompt-library-extension
+gemini extensions install involvex/gemini-cli-prompt-library
 ```
 
 Or install from a local directory:
 
 ```bash
-git clone https://github.com/yourusername/prompt-library-extension.git
-cd prompt-library-extension
+git clone https://github.com/involvex/gemini-cli-prompt-library.git
+cd gemini-cli-prompt-library
 gemini extensions link .
 ```
 
@@ -79,6 +79,31 @@ After installation, restart Gemini CLI and start using prompts:
 - `/debugging:debug-error` - Diagnose and fix errors
 - `/debugging:trace-issue` - Root cause analysis
 - `/debugging:performance-profile` - Performance profiling
+
+### 🗄️ Data
+
+- `/data:pipeline` - Design data pipelines
+- `/data:schema` - Design database schemas
+
+### 🚀 DevOps & Infrastructure
+
+- `/devops:ci-cd` - Design CI/CD pipelines
+- `/devops:docker` - Create Docker configurations
+- `/devops:kubernetes` - Design Kubernetes deployments
+- `/devops:terraform` - Create Terraform configurations
+- `/devops:infrastructure` - Design infrastructure
+- `/devops:monitoring` - Set up monitoring
+- `/devops:security` - DevSecOps practices
+
+### 📱 Mobile Development
+
+- `/mobile:react-native` - React Native development
+- `/mobile:flutter` - Flutter development
+- `/mobile:app` - General mobile app guidance
+
+### 🔌 API Development
+
+- `/api:graphql` - Design GraphQL APIs
 
 ### 🏗️ Architecture & Design
 
@@ -270,9 +295,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📞 Support
 
-- 🐛 [Report Issues](https://github.com/yourusername/prompt-library-extension/issues)
-- 💬 [Discussions](https://github.com/yourusername/prompt-library-extension/discussions)
-- 📧 Email: your.email@example.com
+- 🐛 [Report Issues](https://github.com/involvex/gemini-cli-prompt-library/issues)
+- 💬 [Discussions](https://github.com/involvex/gemini-cli-prompt-library/discussions)
 
 ## 🗺️ Roadmap
 
@@ -286,11 +310,13 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## About me
+## About
 
-My name is Harish Garg. I am a solo developer. I write at my blog [here](https://harishgarg.com/).
+Forked from: https://github.com/harish-garg/gemini-cli-prompt-library
 
-I also maintain a [MCP Resources Directory](https://www.mcpstack.org/) & a [coding ai tools directory](https://www.codeaidirectory.com/)
+Harish Garg. https://github.com/harish-garg
+
+His blog [here](https://harishgarg.com/).
 
 ---
 
