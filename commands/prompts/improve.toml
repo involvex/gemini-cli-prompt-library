@@ -48,4 +48,28 @@ Analyze and improve the following prompt:
 - Are examples provided?
 - Is the level of detail clear?
 
-**
+**Improvements:**
+- Define clear output structure
+- Provide examples of good output
+- Specify level of detail needed
+
+## Output Format
+
+Provide the improved prompt with:
+
+1. **Original Prompt**: The input prompt
+2. **Issues Identified**: List of problems found
+3. **Improved Version**: The enhanced prompt
+4. **Explanation**: Why the changes improve it
+5. **Example Usage**: How the improved prompt performs
+
+## Additional Tips
+
+- Be specific about the AI's role
+- Include context and constraints
+- Use clear, actionable language
+- Provide examples when helpful
+- Specify output format explicitly
+
+Generate a comprehensive prompt improvement analysis.
+"""
