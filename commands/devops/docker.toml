@@ -2,7 +2,7 @@
 category = "devops"
 description = "Docker containerization, images, containers, and orchestration"
 name = "docker"
-tags = ["docker", "containers", "images", "dockerfile", "docker-compose", "registry", "volumes", "networks", "build", "run", "orchestration"]
+tags = ["docker", "containers", "images", "dockerfile", "dockercompose", "registry", "volumes", "networks", "build", "run", "orchestration"]
 
 [template]
 system = """
