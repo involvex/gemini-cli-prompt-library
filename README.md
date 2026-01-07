@@ -211,7 +211,7 @@ mkdir -p commands/mycategory
 touch commands/mycategory/myprompt.toml
 ```
 
-2. Write your prompt:
+1. Write your prompt:
 
 ```toml
 prompt = """
@@ -221,7 +221,7 @@ Your prompt content here with {{args}} for user input.
 """
 ```
 
-3. Restart Gemini CLI to load the new prompt
+1. Restart Gemini CLI to load the new prompt
 
 ### Modifying Existing Prompts
 
@@ -312,9 +312,9 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## About
 
-Forked from: https://github.com/harish-garg/gemini-cli-prompt-library
+Forked from: <https://github.com/harish-garg/gemini-cli-prompt-library>
 
-Harish Garg. https://github.com/harish-garg
+Harish Garg. <https://github.com/harish-garg>
 
 His blog [here](https://harishgarg.com/).
 
