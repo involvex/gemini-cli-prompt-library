@@ -1,0 +1,497 @@
+prompt = """
+# Design Monitoring Strategy
+
+Please design a comprehensive monitoring strategy for the following application:
+
+{{args}}
+
+## Monitoring Framework
+
+### 1. Monitoring Pillars
+
+#### The Four Golden Signals
+```
+1. Latency - How fast responses are
+2. Traffic - How much usage
+3. Errors - Failure rates
+4. Saturation - Resource utilization
+```
+
+### 2. Prometheus Metrics
+
+#### Application Metrics
+```javascript
+// metrics.js
+const promClient = require('prom-client');
+
+const Registry = promClient.Registry;
+const register = new Registry();
+
+const httpRequestsTotal = new promClient.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'path', 'status'],
+  registers: [register],
+});
+
+const httpRequestDuration = new promClient.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'path'],
+  buckets: [0.1, 0.5, 1, 2, 5],
+  registers: [register],
+});
+
+const activeUsers = new promClient.Gauge({
+  name: 'active_users',
+  help: 'Number of currently active users',
+  registers: [register],
+});
+
+const databaseQueryDuration = new promClient.Summary({
+  name: 'database_query_duration_seconds',
+  help: 'Duration of database queries',
+  labelNames: ['query_type', 'table'],
+  registers: [register],
+});
+
+// Middleware for tracking requests
+function metricsMiddleware(req, res, next) {
+  const start = process.hrtime.bigint();
+  
+  res.on('finish', () => {
+    const duration = Number(process.hrtime.bigint() - start) / 1e9;
+    httpRequestsTotal.inc({
+      method: req.method,
+      path: req.route?.path || req.path,
+      status: res.statusCode,
+    });
+    httpRequestDuration.observe(
+      { method: req.method, path: req.route?.path || req.path },
+      duration
+    );
+  });
+  
+  next();
+}
+
+module.exports = {
+  register,
+  httpRequestsTotal,
+  httpRequestDuration,
+  activeUsers,
+  databaseQueryDuration,
+  metricsMiddleware,
+};
+```
+
+#### Python Metrics
+```python
+# metrics.py
+from prometheus_client import Counter, Histogram, Gauge, generate_latest
+
+http_requests = Counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'endpoint', 'status']
+)
+
+http_request_duration = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration',
+    ['method', 'endpoint'],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1, 2, 5]
+)
+
+active_users = Gauge('active_users', 'Number of active users')
+
+def track_request(method, endpoint, status, duration):
+    http_requests.labels(
+        method=method,
+        endpoint=endpoint,
+        status=status
+    ).inc()
+    http_request_duration.labels(
+        method=method,
+        endpoint=endpoint
+    ).observe(duration)
+
+@app.route('/metrics')
+def metrics():
+    return generate_latest()
+```
+
+### 3. Grafana Dashboards
+
+#### Application Overview Dashboard
+```json
+{
+  "dashboard": {
+    "title": "Application Overview",
+    "panels": [
+      {
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[5m])) by (method)",
+            "legendFormat": "{{method}}"
+          }
+        ],
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+            "legendFormat": "Error Rate %"
+          }
+        ],
+        "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
+      },
+      {
+        "title": "Latency P99",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          }
+        ],
+        "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }
+      },
+      {
+        "title": "Active Users",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "active_users",
+            "legendFormat": "Current Users"
+          }
+        ],
+        "gridPos": { "x": 12, "y": 8, "w": 6, "h": 4 }
+      },
+      {
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{namespace=\"production\"}[5m])",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 }
+      },
+      {
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{namespace=\"production\"}",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 }
+      }
+    ]
+  }
+}
+```
+
+### 4. Alerting Rules
+
+```yaml
+# prometheus/alert-rules.yaml
+groups:
+  - name: application-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) 
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High latency detected"
+          description: "P99 latency is {{ $value }}s"
+
+      - alert: LowThroughput
+        expr: |
+          sum(rate(http_requests_total[5m])) < 10
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Low throughput detected"
+          description: "Requests per second is {{ $value }}"
+
+      - alert: HighMemoryUsage
+        expr: |
+          container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: HighCPUUsage
+        expr: |
+          rate(container_cpu_usage_seconds_total[5m]) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+```
+
+### 5. AlertManager Configuration
+
+```yaml
+# alertmanager/alertmanager.yaml
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      continue: true
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+
+receivers:
+  - name: 'default'
+    slack_configs:
+      - channel: '#alerts-general'
+        title: "{{ .Status | toUpper }} - {{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"
+
+  - name: 'critical-alerts'
+    slack_configs:
+      - channel: '#alerts-critical'
+        title: "{{ .Status | toUpper }} - {{ .GroupLabels.alertname }}"
+        text: |
+          *Critical Alert*
+          {{ range .Alerts }}
+          *Description:* {{ .Annotations.description }}
+          *Pod:* {{ .Labels.pod }}
+          *Value:* {{ .Annotations.current_value }}
+          {{ end }}
+        severity: critical
+
+  - name: 'warning-alerts'
+    slack_configs:
+      - channel: '#alerts-warning'
+        title: "{{ .Status | toUpper }} - {{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+```
+
+### 6. Distributed Tracing
+
+#### OpenTelemetry Setup
+```javascript
+// tracing.js
+const opentelemetry = require('@opentelemetry/sdk-node');
+const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
+const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
+const { Resource } = require('@opentelemetry/resources');
+const { SEMRESATTRS_SERVICE_NAME } = require('@opentelemetry/semantic-conventions');
+
+const sdk = new opentelemetry.NodeSDK({
+  resource: new Resource({
+    [SEMRESATTRS_SERVICE_NAME]: 'myapp',
+  }),
+  traceExporter: new OTLPTraceExporter({
+    url: 'http://jaeger:4318/v1/traces',
+  }),
+  instrumentations: [
+    getNodeAutoInstrumentations({
+      '@opentelemetry/instrumentation-fs': { enabled: false },
+    }),
+  ],
+});
+
+sdk.start();
+```
+
+### 7. Log Aggregation
+
+#### Loki Configuration
+```yaml
+# loki/loki-config.yaml
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  path_prefix: /tmp/loki
+  storage:
+    filesystem:
+      chunks_directory: /tmp/loki/chunks
+      rules_directory: /tmp/loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples_max_age: 168h
+  max_streams_match_per_query: 1000
+
+chunk_store_config:
+  max_look_back_period: 720h
+```
+
+#### Fluent Bit Configuration
+```yaml
+# fluent-bit/fluent-bit.conf
+[SERVICE]
+    Flush         5
+    Log_Level     info
+    Daemon        off
+    Parsers_File  parsers.conf
+    HTTP_Server   On
+    HTTP_Listen   0.0.0.0
+    HTTP_Port     2020
+
+[INPUT]
+    Name              tail
+    Path              /var/log/containers/*.log
+    Parser            docker
+    Tag               kube.*
+    Refresh_Interval  5
+    Mem_Buf_Limit     50MB
+    Skip_Long_Lines   On
+
+[FILTER]
+    Name                kubernetes
+    Match               kube.*
+    Kube_URL            https://kubernetes.default.svc:443
+    Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+    Kube_Tag_Prefix     kube.var.log.containers.
+    Merge_Log           On
+    Merge_Log_Key       log_processed
+    K8S-Logging.Parser  On
+    K8S-Logging.Exclude On
+
+[OUTPUT]
+    Name            loki
+    Match           *
+    Host            loki.monitoring.svc.cluster.local
+    Port            3100
+    Labels          app=$app,namespace=$namespace,pod=$pod_name
+    BatchSize       4096
+    BatchWait       10s
+    Line_Filter     On
+```
+
+### 8. SLO Definitions
+
+```yaml
+# slo/slo.yaml
+apiVersion: monitoring.googleapis.com/v1
+kind: ServiceLevelObjective
+metadata:
+  name: api-availability
+  namespace: production
+spec:
+  service: api-service
+  goal: 0.99
+  indicator:
+    request_based:
+      good_total_ratio:
+        total:
+          source: prometheus
+          query: |
+            sum(rate(http_requests_total{service="api"}[5m]))
+        good:
+          source: prometheus
+          query: |
+            sum(rate(http_requests_total{service="api",status!~"5.."}[5m]))
+---
+apiVersion: monitoring.googleapis.com/v1
+kind: ServiceLevelObjective
+metadata:
+  name: api-latency
+  namespace: production
+spec:
+  service: api-service
+  goal: 0.99
+  indicator:
+    request_based:
+      good_total_ratio:
+        total:
+          source: prometheus
+          query: |
+            sum(rate(http_request_duration_seconds_count{service="api"}[5m]))
+        good:
+          source: prometheus
+          query: |
+            sum(rate(http_request_duration_seconds_bucket{service="api",le="0.5"}[5m]))
+```
+
+### 9. Output Format
+
+Provide:
+
+1. **Metrics Strategy**: What metrics to collect and how
+2. **Prometheus Configuration**: Scrape configs and exporters
+3. **Grafana Dashboards**: Key dashboards for monitoring
+4. **Alerting Rules**: Critical alerts and thresholds
+5. **AlertManager Config**: Routing and notification channels
+6. **Distributed Tracing**: Trace collection and visualization
+7. **Log Aggregation**: Log collection and querying
+8. **SLO Definitions**: Service level objectives
+9. **Runbooks**: What to do when alerts fire
+
+Generate a complete, production-ready monitoring strategy.
+"""

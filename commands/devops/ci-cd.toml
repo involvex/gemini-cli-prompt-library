@@ -1,0 +1,257 @@
+prompt = """
+# Design CI/CD Pipeline
+
+Please design a comprehensive CI/CD pipeline for the following project:
+
+{{args}}
+
+## Pipeline Design Framework
+
+### 1. Project Analysis
+
+#### Technology Stack
+- **Language/Framework**: What technologies are used?
+- **Package Manager**: npm, pip, maven, gradle, etc.
+- **Test Framework**: Jest, pytest, JUnit, etc.
+- **Build Tools**: Webpack, vite, make, etc.
+
+#### Repository Structure
+- **Monorepo vs Multi-repo**: Single repo or multiple?
+- **Branch Strategy**: GitFlow, trunk-based, feature branches
+- **Code Quality Tools**: Linters, formatters, type checkers
+
+### 2. Pipeline Stages
+
+#### Stage 1: Code Quality
+```
+Jobs:
+- Linting (ESLint, Pylint, etc.)
+- Formatting check (Prettier, Black, etc.)
+- Type checking (TypeScript, mypy, etc.)
+- Security scanning (SAST, dependency check)
+```
+
+#### Stage 2: Testing
+```
+Jobs:
+- Unit tests (fast, isolated)
+- Integration tests (service interactions)
+- End-to-end tests (user workflows)
+- Performance tests (if applicable)
+- Code coverage analysis
+```
+
+#### Stage 3: Build
+```
+Jobs:
+- Compile/transpile code
+- Bundle assets
+- Create artifacts (Docker images, binaries)
+- Version bumping
+- Artifact signing
+```
+
+#### Stage 4: Security Scan
+```
+Jobs:
+- Dependency vulnerability scan
+- Container image scan
+- Infrastructure scan
+- Secret detection
+- License compliance
+```
+
+#### Stage 5: Deployment
+```
+Jobs:
+- Deploy to development
+- Deploy to staging
+- Automated acceptance tests
+- Deploy to production
+- Health checks
+```
+
+### 3. Pipeline Configuration
+
+#### GitHub Actions Example
+```yaml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run linter
+        run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test -- --coverage
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    steps:
+      - name: Deploy to staging
+        run: kubectl apply -f k8s/staging/
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Deploy to production
+        run: kubectl apply -f k8s/production/
+```
+
+### 4. Branch Strategy
+
+#### Feature Branch Flow
+```
+feature/* → develop → main → production
+```
+
+#### Environment Promotion
+```
+Pull Request → CI checks pass
+      ↓
+Merge to develop → Auto-deploy to Dev
+      ↓
+Test in Dev → Manual approval
+      ↓
+Merge to main → Deploy to Staging
+      ↓
+QA in Staging → Manual approval
+      ↓
+Deploy to Production
+```
+
+### 5. Deployment Strategies
+
+#### Blue-Green Deployment
+```yaml
+deploy:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Deploy to blue environment
+      run: |
+        kubectl apply -f k8s/blue/
+        kubectl set image deployment/web web=image:v2 -n production
+    - name: Health check
+      run: |
+        curl -f http://blue.example.com/health
+```
+
+#### Canary Deployment
+```yaml
+deploy-canary:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Deploy canary (10%)
+      run: |
+        kubectl patch deployment/web -p '{"spec":{"replicas":10}}'
+        kubectl set image deployment/web web=new-image:v2 -n production
+    - name: Monitor metrics
+      run: |
+        sleep 300
+        # Check error rates
+```
+
+### 6. Rollback Strategy
+
+#### Automatic Rollback
+```yaml
+- name: Health check
+  run: |
+    if ! curl -f http://$URL/health; then
+      echo "Health check failed, rolling back..."
+      kubectl rollout undo deployment/myapp -n production
+      exit 1
+    fi
+```
+
+### 7. Security Best Practices
+
+#### Secret Management
+```yaml
+secrets:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+```
+
+### 8. Pipeline Optimization
+
+#### Caching
+```yaml
+- name: Cache node_modules
+  uses: actions/cache@v3
+  with:
+    path: ~/.npm
+    key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+    restore-keys: |
+      ${{ runner.os }}-node-
+```
+
+### 9. Output Format
+
+Provide:
+
+1. **Pipeline Overview**: Summary of the CI/CD flow
+2. **Pipeline Configuration**: Complete YAML configuration
+3. **Stage Breakdown**: Each stage with jobs and steps
+4. **Environment Setup**: How environments are configured
+5. **Deployment Strategy**: How code reaches production
+6. **Rollback Plan**: How to recover from failures
+7. **Security Considerations**: Secret management, permissions
+8. **Performance Optimization**: Caching, parallelization
+
+Generate a complete, production-ready CI/CD pipeline following best practices.
+"""

@@ -1,0 +1,409 @@
+prompt = """
+# Design Docker Configuration
+
+Please design comprehensive Docker configurations for the following application:
+
+{{args}}
+
+## Docker Best Practices Framework
+
+### 1. Base Image Selection
+
+#### Official Images
+```dockerfile
+# Use specific version, not 'latest'
+FROM node:18-alpine
+FROM python:3.11-slim
+FROM golang:1.21-bookworm
+
+# Avoid 'latest' tag
+# BAD: FROM node:latest
+# GOOD: FROM node:18-alpine
+```
+
+#### Alpine vs Slim vs Full
+```
+alpine:     ~5MB    - Minimal, good for production
+slim:       ~50MB   - Balance of size and compatibility
+full:       ~900MB  - Full development environment
+```
+
+### 2. Dockerfile Structure
+
+#### Multi-Stage Build
+```dockerfile
+# Build stage
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM node:18-alpine AS production
+WORKDIR /app
+
+# Copy from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+
+# Set production environment
+ENV NODE_ENV=production
+EXPOSE 3000
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+USER nodejs
+
+CMD ["node", "dist/index.js"]
+```
+
+#### Python Multi-Stage
+```dockerfile
+# Build stage
+FROM python:3.11-slim AS builder
+WORKDIR /build
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+
+# Production stage
+FROM python:3.11-slim AS production
+WORKDIR /app
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /build /app
+RUN pip install --no-cache-dir gunicorn
+EXPOSE 8000
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
+```
+
+### 3. .dockerignore
+
+```
+# Version control
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Dependencies
+node_modules
+__pycache__
+venv
+.env
+
+# Logs
+*.log
+npm-debug.log
+
+# Tests
+coverage
+.nyc_output
+
+# Documentation
+README.md
+docs/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+```
+
+### 4. Security Best Practices
+
+#### Non-Root User
+```dockerfile
+# Create user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# Copy files
+COPY --chown=appuser:appgroup . /home/appuser/app
+
+# Switch to user
+USER appuser
+```
+
+#### Security Headers
+```dockerfile
+# Add security headers
+ENV SECURITY_HEADER_NAME="Content-Security-Policy"
+ENV SECURITY_HEADER_VALUE="default-src 'self'"
+
+# Or use nginx with security headers
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+```
+
+### 5. Health Checks
+
+#### Node.js Health Check
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:$PORT/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+```
+
+#### Python Health Check
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD python -e "import urllib.request; urllib.request.urlopen('http://localhost:$PORT/health')" || exit 1
+```
+
+#### Shell Health Check
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:$PORT/health || exit 1
+```
+
+### 6. Environment Variables
+
+#### .env file
+```bash
+# .env
+NODE_ENV=development
+DATABASE_URL=postgres://user:pass@localhost:5432/db
+REDIS_URL=redis://localhost:6379
+API_KEY=your-api-key
+```
+
+#### Docker Compose Override
+```yaml
+# docker-compose.override.yml
+services:
+  app:
+    environment:
+      - NODE_ENV=development
+      - DEBUG=true
+    volumes:
+      - ./src:/app/src
+```
+
+### 7. Docker Compose
+
+#### Development Setup
+```yaml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/myapp
+    volumes:
+      - ./src:/app/src
+      - /app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+#### Production Setup
+```yaml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myapp:latest
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://user:pass@db:5432/myapp
+    secrets:
+      - db_password
+      - api_key
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_USER: myapp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  api_key:
+    file: ./secrets/api_key.txt
+
+volumes:
+  postgres_data:
+```
+
+### 8. Resource Limits
+
+#### Docker Compose Limits
+```yaml
+services:
+  app:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+```
+
+#### Container Runtime
+```bash
+docker run \
+  --memory=512m \
+  --memory-swap=1g \
+  --cpus=1.0 \
+  --cpu-shares=512 \
+  myapp:latest
+```
+
+### 9. Logging Configuration
+
+#### Docker Compose Logging
+```yaml
+services:
+  app:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+#### Production Logging
+```yaml
+services:
+  app:
+    logging:
+      driver: "syslog"
+      options:
+        syslog-address: "tcp://192.168.1.100:514"
+        tag: "myapp-{{.Name}}"
+```
+
+### 10. Network Configuration
+
+#### Custom Networks
+```yaml
+services:
+  app:
+    networks:
+      - frontend
+      - backend
+
+  db:
+    networks:
+      - backend
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true  # No external access
+```
+
+### 11. Build Optimization
+
+#### Docker BuildKit
+```bash
+# Enable BuildKit
+export DOCKER_BUILDKIT=1
+docker build .
+
+# Or use docker-compose
+docker-compose build --build-arg NODE_ENV=production
+```
+
+#### Build Arguments
+```dockerfile
+ARG NODE_VERSION=18
+FROM node:${NODE_VERSION}-alpine
+
+ARG BUILD_DATE
+ARG VCS_REF
+LABEL maintainer="team@example.com" \
+      org.label-schema.build-date="${BUILD_DATE}" \
+      org.label-schema.vcs-ref="${VCS_REF}" \
+      org.label-schema.version="${VERSION}"
+```
+
+### 12. Output Format
+
+Provide:
+
+1. **Dockerfile**: Optimized multi-stage Dockerfile
+2. **.dockerignore**: Comprehensive ignore file
+3. **docker-compose.yml**: Development environment
+4. **docker-compose.prod.yml**: Production environment
+5. **Configuration Files**: nginx.conf, etc.
+6. **Security Guidelines**: Non-root user, secrets management
+7. **Health Checks**: Proper health check configuration
+8. **Resource Limits**: CPU and memory limits
+
+Generate complete, secure, and optimized Docker configurations.
+"""
