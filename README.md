@@ -1,13 +1,15 @@
 # 📚 Prompt Library - Gemini CLI Extension
 
-A curated library of high-quality, professionally crafted prompts for common development tasks. Save time and improve your AI interactions with battle-tested prompt templates.
+A curated library of high-quality, professionally crafted prompts for common
+development tasks. Save time and improve your AI interactions with
+battle-tested prompt templates.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-Extension-blue)](https://geminicli.com/)
 
 ## ✨ Features
 
-- 🎯 **30+ Professional Prompts** - Carefully crafted for common development tasks
+- 🎯 **50+ Professional Prompts** - Carefully crafted for common development tasks
 - 🚀 **Instant Access** - Simple slash commands for quick execution
 - 📖 **Learn by Example** - See prompt engineering best practices in action
 - 🎨 **Organized Categories** - Easy to browse and discover prompts
@@ -19,14 +21,14 @@ A curated library of high-quality, professionally crafted prompts for common dev
 Install the extension using the Gemini CLI:
 
 ```bash
-gemini extensions install involvex/prompt-library-extension
+gemini extensions install involvex/gemini-cli-prompt-library
 ```
 
 Or install from a local directory:
 
 ```bash
-git clone https://github.com/involvex/prompt-library-extension.git
-cd prompt-library-extension
+git clone https://github.com/involvex/gemini-cli-prompt-library.git
+cd gemini-cli-prompt-library
 gemini extensions link .
 ```
 
@@ -54,46 +56,79 @@ After installation, restart Gemini CLI and start using prompts:
 ## 📋 Available Prompts
 
 ### 🔍 Code Review & Analysis
+
 - `/code-review:security` - Deep security analysis
 - `/code-review:performance` - Performance optimization
 - `/code-review:best-practices` - Best practices review
 - `/code-review:refactor` - Refactoring suggestions
 
 ### 📝 Documentation
+
 - `/docs:write-readme` - Generate comprehensive README
 - `/docs:write-api-docs` - Create API documentation
 - `/docs:write-changelog` - Generate changelog
 - `/docs:write-contributing` - Create contribution guidelines
 
 ### 🧪 Testing
+
 - `/testing:generate-unit-tests` - Create unit tests
 - `/testing:generate-e2e-tests` - Create end-to-end tests
 - `/testing:edge-cases` - Identify edge cases
 - `/testing:coverage-analysis` - Analyze test coverage
 
 ### 🐛 Debugging
+
 - `/debugging:debug-error` - Diagnose and fix errors
 - `/debugging:trace-issue` - Root cause analysis
 - `/debugging:performance-profile` - Performance profiling
 
+### 🗄️ Data
+
+- `/data:pipeline` - Design data pipelines
+- `/data:schema` - Design database schemas
+
+### 🚀 DevOps & Infrastructure
+
+- `/devops:ci-cd` - Design CI/CD pipelines
+- `/devops:docker` - Create Docker configurations
+- `/devops:kubernetes` - Design Kubernetes deployments
+- `/devops:terraform` - Create Terraform configurations
+- `/devops:infrastructure` - Design infrastructure
+- `/devops:monitoring` - Set up monitoring
+- `/devops:security` - DevSecOps practices
+
+### 📱 Mobile Development
+
+- `/mobile:react-native` - React Native development
+- `/mobile:flutter` - Flutter development
+- `/mobile:app` - General mobile app guidance
+
+### 🔌 API Development
+
+- `/api:graphql` - Design GraphQL APIs
+
 ### 🏗️ Architecture & Design
+
 - `/architecture:design-api` - Design RESTful APIs
 - `/architecture:design-database` - Design database schemas
 - `/architecture:system-design` - System architecture
 - `/architecture:design-patterns` - Suggest design patterns
 
 ### 📚 Learning & Explanation
+
 - `/learning:explain-concept` - Explain technical concepts
 - `/learning:eli5` - Explain like I'm 5
 - `/learning:compare-tech` - Compare technologies
 - `/learning:roadmap` - Create learning paths
 
 ### ✍️ Writing & Communication
+
 - `/writing:technical-blog` - Write technical posts
 - `/writing:email` - Draft professional emails
 - `/writing:presentation` - Create presentation outlines
 
 ### 🎨 Prompt Engineering
+
 - `/prompts:improve` - Improve existing prompts
 - `/prompts:create-template` - Create prompt templates
 - `/prompts:best-practices` - Learn prompt tips
@@ -111,7 +146,8 @@ function loginUser(username, password) {
 "
 ```
 
-**Output:** Comprehensive security analysis identifying SQL injection vulnerability, authentication issues, and providing secure code examples.
+**Output:** Comprehensive security analysis identifying SQL injection
+vulnerability, authentication issues, and providing secure code examples.
 
 ### Generate Unit Tests
 
@@ -123,7 +159,7 @@ function calculateDiscount(price, discountPercent) {
 "
 ```
 
-**Output:** Complete test suite with happy paths, edge cases, boundary values, and error conditions.
+**Output:** Complete test suite with happy paths, edge cases, and error conditions.
 
 ### Explain Concept
 
@@ -131,7 +167,8 @@ function calculateDiscount(price, discountPercent) {
 /learning:explain-concept "closures in JavaScript"
 ```
 
-**Output:** Multi-level explanation from ELI5 to technical details, with examples, use cases, and best practices.
+**Output:** Multi-level explanation from ELI5 to technical details, with
+examples, use cases, and best practices.
 
 ### Design API
 
@@ -139,26 +176,31 @@ function calculateDiscount(price, discountPercent) {
 /architecture:design-api "A blog platform with posts, comments, users, and tags"
 ```
 
-**Output:** Complete REST API design with endpoints, data models, authentication, and OpenAPI documentation.
+**Output:** Complete REST API design with endpoints, data models, auth, and
+OpenAPI documentation.
 
 ## 🎯 Why Use This Extension?
 
 ### Save Time
+
 - Pre-crafted prompts eliminate trial and error
 - Instant access via simple commands
 - Consistent, high-quality results
 
 ### Improve Quality
+
 - Based on prompt engineering best practices
 - Comprehensive, structured outputs
 - Professional-grade results
 
 ### Learn Prompt Engineering
+
 - See examples of effective prompts
 - Understand what makes prompts work
 - Build your own custom prompts
 
 ### Boost Productivity
+
 - Quick access to common tasks
 - Reduce context switching
 - Focus on problem-solving, not prompt crafting
@@ -174,7 +216,7 @@ mkdir -p commands/mycategory
 touch commands/mycategory/myprompt.toml
 ```
 
-2. Write your prompt:
+1. Write your prompt:
 
 ```toml
 prompt = """
@@ -184,7 +226,7 @@ Your prompt content here with {{args}} for user input.
 """
 ```
 
-3. Restart Gemini CLI to load the new prompt
+1. Restart Gemini CLI to load the new prompt
 
 ### Modifying Existing Prompts
 
@@ -195,24 +237,31 @@ Fork the repository and edit any `.toml` file to customize prompts to your needs
 Based on the prompts in this library, here are key principles:
 
 ### 1. **Be Specific**
-```
+
+```text
 ❌ "Review this code"
-✅ "Perform a security analysis focusing on input validation, SQL injection, and XSS vulnerabilities"
+✅ "Perform a security analysis focusing on input validation, SQL
+injection, and XSS vulnerabilities"
 ```
 
 ### 2. **Provide Structure**
+
 Use clear sections, numbering, and formatting to guide the AI's response.
 
 ### 3. **Include Context**
+
 Specify the language, framework, use case, and constraints.
 
 ### 4. **Request Examples**
+
 Ask for code examples, not just explanations.
 
 ### 5. **Define Output Format**
+
 Specify exactly how you want the response structured.
 
 ### 6. **Use Variables**
+
 Make prompts reusable with `{{args}}` placeholders.
 
 ## 🤝 Contributing
@@ -235,6 +284,7 @@ Contributions are welcome! Here's how you can help:
 ## 📖 Documentation
 
 For more information about Gemini CLI extensions:
+
 - [Gemini CLI Documentation](https://geminicli.com/docs/)
 - [Extension Development Guide](https://geminicli.com/docs/extensions/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
@@ -251,9 +301,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📞 Support
 
-- 🐛 [Report Issues](https://github.com/involvex/prompt-library-extension/issues)
-- 💬 [Discussions](https://github.com/involvex/prompt-library-extension/discussions)
-- 📧 Email: harish@harishgarg.com
+- 🐛 [Report Issues](https://github.com/involvex/gemini-cli-prompt-library/issues)
+- 💬 [Discussions](https://github.com/involvex/gemini-cli-prompt-library/discussions)
 
 ## 🗺️ Roadmap
 
@@ -267,14 +316,16 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## About me
-My name is Harish Garg. I am a solo developer. I write at my blog [here](https://harishgarg.com/).
+## About
 
-I also maintain a [MCP Resources Directory](https://www.mcpstack.org/) & a [coding ai tools directory](https://www.codeaidirectory.com/)
+Forked from: <https://github.com/harish-garg/gemini-cli-prompt-library>
+
+Harish Garg. <https://github.com/harish-garg>
+
+His blog at [harishgarg.com](https://harishgarg.com/).
 
 ---
 
-**Made with ❤️ for the Gemini CLI community**
+## Made with ❤️ for the Gemini CLI community
 
 Star ⭐ this repo if you find it useful!
-

@@ -1,0 +1,171 @@
+prompt = """
+# Kubernetes Configuration
+
+Please help configure Kubernetes resources for:
+
+{{args}}
+
+## Kubernetes Resources
+
+### 1. Deployment
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{name}}
+  labels:
+    app: {{name}}
+spec:
+  replicas: {{replicas|default: 3}}
+  selector:
+    matchLabels:
+      app: {{name}}
+  template:
+    metadata:
+      labels:
+        app: {{name}}
+    spec:
+      containers:
+        - name: {{name}}
+          image: {{image}}
+          ports:
+            - containerPort: {{port|default: 8080}}
+          resources:
+            requests:
+              cpu: "{{cpu_request|default: 100m}}"
+              memory: "{{memory_request|default: 128Mi}}"
+            limits:
+              cpu: "{{cpu_limit|default: 500m}}"
+              memory: "{{memory_limit|default: 256Mi}}"
+          env:
+            {{#if env}}
+            {{env}}
+            {{/if}}
+          livenessProbe:
+            httpGet:
+              path: {{liveness_path|default: /health}}
+              port: {{port|default: 8080}}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: {{readiness_path|default: /ready}}
+              port: {{port|default: 8080}}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+```
+
+### 2. Service
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{name}}
+spec:
+  type: {{service_type|default: ClusterIP}}
+  selector:
+    app: {{name}}
+  ports:
+    - port: {{port|default: 80}}
+      targetPort: {{target_port|default: 8080}}
+      protocol: TCP
+```
+
+### 3. Ingress
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{name}}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - {{domain}}
+      secretName: {{name}}-tls
+  rules:
+    - host: {{domain}}
+      http:
+        paths:
+          - path: {{path|default: /}}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{name}}
+                port:
+                  number: {{port|default: 80}}
+```
+
+### 4. ConfigMap
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{name}}-config
+data:
+  {{config_data}}
+```
+
+### 5. Secret
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{name}}-secret
+type: Opaque
+stringData:
+  {{secret_data}}
+```
+
+### 6. HorizontalPodAutoscaler
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{name}}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{name}}
+  minReplicas: {{min_replicas|default: 2}}
+  maxReplicas: {{max_replicas|default: 10}}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{cpu_target|default: 70}}
+```
+
+## Best Practices
+
+### Security
+- Use non-root user in container
+- Set resource limits
+- Enable pod security policies
+- Use secrets for sensitive data
+
+### Health Checks
+- Configure liveness probe
+- Configure readiness probe
+- Set appropriate timeouts
+
+### Scaling
+- Configure HPA for auto-scaling
+- Set resource requests/limits
+- Use pod disruption budgets
+
+## Output Requirements
+
+Provide:
+1. Complete Kubernetes manifests
+2. Namespace configuration
+3. Resource quotas
+4. Network policies
+5. RBAC configuration
+6. Helm chart structure (if applicable)
+"""

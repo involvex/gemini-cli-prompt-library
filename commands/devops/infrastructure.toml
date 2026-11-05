@@ -1,0 +1,544 @@
+prompt = """
+# Design Infrastructure as Code
+
+Please design comprehensive IaC configurations for the following infrastructure:
+
+{{args}}
+
+## Infrastructure as Code Framework
+
+### 1. Terraform Structure
+
+#### Main Configuration
+```hcl
+# main.tf
+terraform {
+  required_version = ">= 1.5.0"
+  
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.0"
+    }
+  }
+  
+  backend "s3" {
+    bucket         = "my-terraform-state"
+    key            = "production/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+  
+  default_tags {
+    tags = {
+      Environment = var.environment
+      ManagedBy   = "terraform"
+      Project     = var.project_name
+    }
+  }
+}
+
+provider "kubernetes" {
+  config_path = "~/.kube/config"
+}
+```
+
+#### Variables
+```hcl
+# variables.tf
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "Environment must be dev, staging, or prod."
+  }
+}
+
+variable "project_name" {
+  description = "Project name"
+  type        = string
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR block"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "availability_zones" {
+  description = "Availability zones"
+  type        = list(string)
+  default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
+}
+
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.medium"
+}
+
+variable "desired_capacity" {
+  description = "Auto scaling group desired capacity"
+  type        = number
+  default     = 2
+}
+
+variable "min_size" {
+  description = "Auto scaling group minimum size"
+  type        = number
+  default     = 2
+}
+
+variable "max_size" {
+  description = "Auto scaling group maximum size"
+  type        = number
+  default     = 10
+}
+```
+
+### 2. VPC Configuration
+
+```hcl
+# networking/vpc.tf
+resource "aws_vpc" "main" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+  
+  tags = {
+    Name        = "${var.project_name}-vpc-${var.environment}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_subnet" "public" {
+  count = length(var.availability_zones)
+  
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
+  availability_zone       = var.availability_zones[count.index]
+  map_public_ip_on_launch = true
+  
+  tags = {
+    Name        = "${var.project_name}-public-${count.index}"
+    Environment = var.environment
+    Type        = "public"
+  }
+}
+
+resource "aws_subnet" "private" {
+  count = length(var.availability_zones)
+  
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = cidrsubnet(var.vpc_cidr, 8, length(var.availability_zones) + count.index)
+  availability_zone = var.availability_zones[count.index]
+  
+  tags = {
+    Name        = "${var.project_name}-private-${count.index}"
+    Environment = var.environment
+    Type        = "private"
+  }
+}
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+  
+  tags = {
+    Name        = "${var.project_name}-igw-${var.environment}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_nat_gateway" "nat" {
+  count = length(var.availability_zones)
+  
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
+  
+  tags = {
+    Name        = "${var.project_name}-nat-${count.index}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_eip" "nat" {
+  count = length(var.availability_zones)
+  domain = "vpc"
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+  
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+  
+  tags = {
+    Name        = "${var.project_name}-public-rt"
+    Environment = var.environment
+  }
+}
+
+resource "aws_route_table" "private" {
+  count = length(var.availability_zones)
+  
+  vpc_id = aws_vpc.main.id
+  
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway[count.index].id
+  }
+  
+  tags = {
+    Name        = "${var.project_name}-private-rt-${count.index}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_route_table_association" "public" {
+  count = length(var.availability_zones)
+  
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "private" {
+  count = length(var.availability_zones)
+  
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private[count.index].id
+}
+```
+
+### 3. Security Groups
+
+```hcl
+# security/security-groups.tf
+resource "aws_security_group" "alb" {
+  name        = "${var.project_name}-alb-sg-${var.environment}"
+  description = "Security group for ALB"
+  vpc_id      = aws_vpc.main.id
+  
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  tags = {
+    Name        = "${var.project_name}-alb-sg"
+    Environment = var.environment
+  }
+}
+
+resource "aws_security_group" "app" {
+  name        = "${var.project_name}-app-sg-${var.environment}"
+  description = "Security group for application"
+  vpc_id      = aws_vpc.main.id
+  
+  ingress {
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+  
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  tags = {
+    Name        = "${var.project_name}-app-sg"
+    Environment = var.environment
+  }
+}
+
+resource "aws_security_group" "db" {
+  name        = "${var.project_name}-db-sg-${var.environment}"
+  description = "Security group for database"
+  vpc_id      = aws_vpc.main.id
+  
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app.id]
+  }
+  
+  tags = {
+    Name        = "${var.project_name}-db-sg"
+    Environment = var.environment
+  }
+}
+```
+
+### 4. RDS Database
+
+```hcl
+# databases/rds.tf
+resource "aws_db_subnet_group" "main" {
+  name       = "${var.project_name}-db-subnet-${var.environment}"
+  subnet_ids = aws_subnet.private[*].id
+}
+
+resource "aws_db_instance" "main" {
+  identifier        = "${var.project_name}-db-${var.environment}"
+  engine            = "postgres"
+  engine_version    = "15.4"
+  instance_class    = "db.t3.medium"
+  allocated_storage = 20
+  storage_encrypted = true
+  
+  db_name  = var.project_name
+  username = "admin"
+  password = random_password.db_password.result
+  
+  vpc_security_group_ids = [aws_security_group.db.id]
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  
+  backup_retention_period = 7
+  skip_final_snapshot     = false
+  deletion_protection     = var.environment == "prod" ? true : false
+  
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+  
+  tags = {
+    Name        = "${var.project_name}-db"
+    Environment = var.environment
+  }
+}
+
+resource "random_password" "db_password" {
+  length  = 32
+  special = false
+}
+
+resource "aws_s3_bucket" "backups" {
+  bucket = "${var.project_name}-backups-${var.environment}"
+}
+
+resource "aws_db_event_subscription" "main" {
+  name      = "${var.project_name}-db-events-${var.environment}"
+  sns_topic = aws_sns_topic.db_events.arn
+  
+  source_type    = "db-instance"
+  source_ids     = [aws_db_instance.main.id]
+  
+  event_categories = [
+    "availability",
+    "deletion",
+    "failure",
+    "low storage",
+    "maintenance",
+    "notification",
+    "recovery",
+  ]
+}
+```
+
+### 5. Auto Scaling Group
+
+```hcl
+# compute/asg.tf
+resource "aws_launch_template" "app" {
+  name_prefix   = "${var.project_name}-app-${var.environment}"
+  image_id      = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+  
+  vpc_security_group_ids = [aws_security_group.app.id]
+  
+  iam_instance_profile {
+    name = aws_iam_instance_profile.app.name
+  }
+  
+  block_device_mappings {
+    device_name = "/dev/sda1"
+    ebs {
+      volume_size           = 20
+      volume_type           = "gp3"
+      delete_on_termination = true
+    }
+  }
+  
+  user_data = base64encode(templatefile("user-data.sh", {
+    environment = var.environment
+    region      = var.region
+  }))
+  
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name        = "${var.project_name}-app-${var.environment}"
+      Environment = var.environment
+    }
+  }
+}
+
+resource "aws_autoscaling_group" "app" {
+  name                = "${var.project_name}-asg-${var.environment}"
+  vpc_zone_identifier = aws_subnet.private[*].id
+  target_group_arns   = [aws_lb_target_group.app.arn]
+  
+  desired_capacity = var.desired_capacity
+  min_size         = var.min_size
+  max_size         = var.max_size
+  
+  launch_template {
+    id      = aws_launch_template.app.id
+    version = "$Latest"
+  }
+  
+  tag {
+    key                 = "Name"
+    value               = "${var.project_name}-app-${var.environment}"
+    propagate_at_launch = true
+  }
+  
+  tag {
+    key                 = "Environment"
+    value               = var.environment
+    propagate_at_launch = true
+  }
+  
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_autoscaling_policy" "scale_up" {
+  name                   = "${var.project_name}-scale-up"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = aws_autoscaling_group.app.name
+}
+
+resource "aws_autoscaling_policy" "scale_down" {
+  name                   = "${var.project_name}-scale-down"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 600
+  autoscaling_group_name = aws_autoscaling_group.app.name
+}
+```
+
+### 6. ALB Configuration
+
+```hcl
+# networking/alb.tf
+resource "aws_lb" "main" {
+  name               = "${var.project_name}-alb-${var.environment}"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = aws_subnet.public[*].id
+  
+  enable_deletion_protection = var.environment == "prod"
+  
+  access_logs {
+    bucket  = aws_s3_bucket.alb_logs.bucket
+    prefix  = "${var.environment}/"
+    enabled = true
+  }
+  
+  tags = {
+    Name        = "${var.project_name}-alb"
+    Environment = var.environment
+  }
+}
+
+resource "aws_lb_target_group" "app" {
+  name        = "${var.project_name}-tg-${var.environment}"
+  port        = 3000
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "instance"
+  
+  health_check {
+    path                = "/health"
+    healthy_threshold   = 2
+    unhealthy_threshold = 10
+    timeout             = 30
+    interval            = 60
+  }
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 80
+  protocol          = "HTTP"
+  
+  default_action {
+    type = "redirect"
+    
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = aws_acm_certificate.main.arn
+  
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+```
+
+### 7. Output Format
+
+Provide:
+
+1. **Terraform Configuration**: Complete IaC setup
+2. **VPC Design**: Network topology and subnets
+3. **Security Groups**: Network isolation rules
+4. **Database Setup**: RDS with backups
+5. **Compute Resources**: ASG with launch templates
+6. **Load Balancer**: ALB with HTTPS
+7. **State Management**: Backend and state locking
+8. **Variable Definitions**: Environment-specific values
+9. **Module Structure**: How to organize modules
+
+Generate complete, production-ready Infrastructure as Code.
+"""
